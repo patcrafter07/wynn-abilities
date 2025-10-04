@@ -14,6 +14,8 @@
     .ability { border-bottom: 1px solid #ececec; margin-bottom: 10px; }
     h2, h3 { margin-bottom: 6px; }
     .desc { font-size: 90%; margin: 3px 0; }
+    #export-btn { margin: 24px 0 8px 0; font-weight: bold; }
+    #export-output { width: 100%; min-height:40px; font-family: monospace; background: #f6f6f7; }
   </style>
 </head>
 <body>
@@ -23,7 +25,10 @@
       Class:
       <select id="classSelector">
           <option value="mage">Mage</option>
-          <!-- Add more classes as needed -->
+          <option value="archer">Archer</option>
+          <option value="warrior">Warrior</option>
+          <option value="assassin">Assassin</option>
+          <option value="shaman">Shaman</option>
       </select>
     </label>
     <button id="resetBtn">Reset</button>
@@ -35,168 +40,581 @@
   </div>
   <div id="abilitiesArea"></div>
   <div id="archetypesArea"></div>
+  <button id="export-btn">Export Unlocked Abilities</button>
+  <textarea id="export-output" readonly></textarea>
+
   <script>
-    // ----- STATIC DATA -----
-    const treeData = {
-      mage: {
-        archetypes: {
-          blitz: { name: "Riftwalker", description: "Bend time and ramp up", shortDescription: "Bend time and ramp up" },
-          priest: { name: "Light Bender", description: "Grow from healing", shortDescription: "Grow from healing" },
-          arcane: { name: "Arcanist", description: "Uncontrollable chaotic power", shortDescription: "Uncontrollable chaotic power" },
+    // -------- ALL CLASSES STATIC DATA BEGIN --------
+    const treeData = 
+{
+  mage: {
+    archetypes: {
+      riftwalker: { name: "Riftwalker", description: "Manipulate time to increase spell power and speed.", shortDescription: "Time magic and spell ramp." },
+      lightbender: { name: "Light Bender", description: "Intensify healing and shielding magic for you and allies.", shortDescription: "Healing and buffs." },
+      arcanist: { name: "Arcanist", description: "Unleash chaotic arcane force for destructive power.", shortDescription: "Arcane burst damage." }
+    },
+    pages: {
+      "1": {
+        "Unlock Meteor": {
+          name: "Meteor",
+          description: [
+            "RIGHT-LEFT-LEFT (R-L-L): Summon a Meteor, dealing high damage in an area."
+          ],
+          requirements: {},
+          page: 1
         },
-        pages: {
-          "1": {
-            meteor: {
-              name: "Meteor",
-              description: [
-                "Click Combo: RIGHT-LEFT-LEFT",
-                "Conjures a slow but powerful meteor from the sky, dealing massive damage over a large area.",
-                "Mana Cost: 50",
-                "Total Damage: 400%"
-              ],
-              requirements: { ABILITY_POINTS: 1 },
-              links: ["wandProficiency"],
-              locks: null,
-              page: 1,
-            },
-            wandProficiency: {
-              name: "Wand Proficiency I",
-              description: [
-                "Improve your Main Attack's damage and range when using a wand.",
-                "Main Attack Damage: +5%",
-                "Main Attack Range: +2 Blocks"
-              ],
-              requirements: { ABILITY_POINTS: 1 },
-              links: [],
-              locks: null,
-              page: 1,
-            }
-          },
-          "2": {
-            teleport: {
-              name: "Teleport",
-              description: [
-                "Click Combo: RIGHT-RIGHT-RIGHT",
-                "Instantly teleport in the direction you're facing.",
-                "Mana Cost: 25"
-              ],
-              requirements: { ABILITY_POINTS: 1 },
-              links: [],
-              locks: null,
-              page: 2,
-            }
-          }
+        "Unlock Wand Proficiency I": {
+          name: "Wand Proficiency I",
+          description: [
+            "Increase main attack damage and range while wielding a wand."
+          ],
+          requirements: {},
+          page: 1
+        },
+        "Unlock Cheaper Meteor": {
+          name: "Cheaper Meteor",
+          description: [
+            "Reduce Meteor's mana cost."
+          ],
+          requirements: { NODE: "Unlock Meteor" },
+          page: 1
+        },
+        "Unlock Shooting Star": {
+          name: "Shooting Star",
+          description: [
+            "Increase Meteor's speed."
+          ],
+          requirements: { NODE: "Unlock Wand Proficiency I" },
+          page: 1
         }
+      },
+      "2": {
+        "Unlock Teleport": {
+          name: "Teleport",
+          description: [
+            "RIGHT-RIGHT-RIGHT (R-R-R): Instantly teleport forward and deal damage on arrival."
+          ],
+          requirements: {},
+          page: 2
+        },
+        "Unlock Heal": {
+          name: "Heal",
+          description: [
+            "RIGHT-LEFT-RIGHT (R-L-R): Heal yourself and all nearby allies over time."
+          ],
+          requirements: {},
+          page: 2
+        },
+        "Unlock Cheaper Teleport": {
+          name: "Cheaper Teleport",
+          description: [
+            "Reduces Teleport mana cost."
+          ],
+          requirements: { NODE: "Unlock Teleport" },
+          page: 2
+        },
+        "Unlock Cheaper Heal": {
+          name: "Cheaper Heal",
+          description: [
+            "Reduces Heal mana cost."
+          ],
+          requirements: { NODE: "Unlock Heal" },
+          page: 2
+        }
+      },
+      "3": {
+        "Unlock Ice Snake": {
+          name: "Ice Snake",
+          description: [
+            "RIGHT-RIGHT-LEFT (R-R-L): Summon an ice snake that slows enemies."
+          ],
+          requirements: {},
+          page: 3
+        },
+        "Unlock Thunderstorm": {
+          name: "Thunderstorm",
+          description: [
+            "Meteor now calls lightning strikes, further damaging the impact area."
+          ],
+          requirements: { NODE: "Unlock Meteor" },
+          page: 3
+        }
+      }
+      // ... (repeat format for all Mage ability pages; truncated for brevity)
+    }
+  },
+    archer: {
+    archetypes: {
+      sharpshooter: { name: "Sharpshooter", description: "Focused precision for single target elimination.", shortDescription: "Single-target focus." },
+      beastmaster: { name: "Beastmaster", description: "Summon and enhance animal companions.", shortDescription: "Animal companions." },
+      trapper: { name: "Trapper", description: "Area control with traps and indirect damage.", shortDescription: "Traps and area control." }
+    },
+    pages: {
+      "1": {
+        "Unlock Arrow Bomb": {
+          name: "Arrow Bomb",
+          description: [
+            "RIGHT-LEFT-RIGHT (R-L-R): Fire an explosive arrow that deals area damage."
+          ],
+          requirements: {},
+          page: 1
+        },
+        "Unlock Bow Proficiency I": {
+          name: "Bow Proficiency I",
+          description: [
+            "Increase main attack damage and range while wielding a bow."
+          ],
+          requirements: {},
+          page: 1
+        },
+        "Unlock Cheaper Arrow Bomb": {
+          name: "Cheaper Arrow Bomb",
+          description: [
+            "Reduce Arrow Bomb's mana cost."
+          ],
+          requirements: { NODE: "Unlock Arrow Bomb" },
+          page: 1
+        },
+        "Unlock Nimble String": {
+          name: "Nimble String",
+          description: [
+            "Increase bow attack speed."
+          ],
+          requirements: { NODE: "Unlock Bow Proficiency I" },
+          page: 1
+        }
+      },
+      "2": {
+        "Unlock Escape": {
+          name: "Escape",
+          description: [
+            "RIGHT-RIGHT-RIGHT (R-R-R): Leap backwards and gain speed boost."
+          ],
+          requirements: {},
+          page: 2
+        },
+        "Unlock Arrow Shield": {
+          name: "Arrow Shield",
+          description: [
+            "RIGHT-RIGHT-LEFT (R-R-L): Create a shield that absorbs damage."
+          ],
+          requirements: {},
+          page: 2
+        },
+        "Unlock Cheaper Escape": {
+          name: "Cheaper Escape",
+          description: [
+            "Reduces Escape mana cost."
+          ],
+          requirements: { NODE: "Unlock Escape" },
+          page: 2
+        }
+      },
+      "3": {
+        "Unlock Arrow Rain": {
+          name: "Arrow Rain",
+          description: [
+            "RIGHT-LEFT-LEFT (R-L-L): Rain arrows over a large area."
+          ],
+          requirements: {},
+          page: 3
+        },
+        "Unlock Phantom Ray": {
+          name: "Phantom Ray",
+          description: [
+            "Arrow Bomb now pierces through enemies."
+          ],
+          requirements: { NODE: "Unlock Arrow Bomb" },
+          page: 3
+        }
+      }
+    }
+  },
+    warrior: {
+    archetypes: {
+      paladin: { name: "Paladin", description: "Defensive and regenerative powers for tanking.", shortDescription: "Defensive tank." },
+      berserker: { name: "Berserker", description: "Aggressive offense and self-buffing for heavy impact.", shortDescription: "Aggressive damage." },
+      warlord: { name: "Warlord", description: "Team buffs and strategic power.", shortDescription: "Team support and strategy." }
+    },
+    pages: {
+      "1": {
+        "Unlock Bash": {
+          name: "Bash",
+          description: [
+            "RIGHT-LEFT-RIGHT (R-L-R): Smash the ground to deal area damage."
+          ],
+          requirements: {},
+          page: 1
+        },
+        "Unlock Spear Proficiency I": {
+          name: "Spear Proficiency I",
+          description: [
+            "Increase main attack damage and range while wielding a spear."
+          ],
+          requirements: {},
+          page: 1
+        },
+        "Unlock Cheaper Bash": {
+          name: "Cheaper Bash",
+          description: [
+            "Reduce Bash's mana cost."
+          ],
+          requirements: { NODE: "Unlock Bash" },
+          page: 1
+        },
+        "Unlock Crushing Blow": {
+          name: "Crushing Blow",
+          description: [
+            "Increase Bash's radius."
+          ],
+          requirements: { NODE: "Unlock Spear Proficiency I" },
+          page: 1
+        }
+      },
+      "2": {
+        "Unlock Charge": {
+          name: "Charge",
+          description: [
+            "RIGHT-RIGHT-RIGHT (R-R-R): Rush forward quickly, damaging anything in the path."
+          ],
+          requirements: {},
+          page: 2
+        },
+        "Unlock War Scream": {
+          name: "War Scream",
+          description: [
+            "RIGHT-RIGHT-LEFT (R-R-L): Inspire allies and gain temporary buffs."
+          ],
+          requirements: {},
+          page: 2
+        },
+        "Unlock Cheaper Charge": {
+          name: "Cheaper Charge",
+          description: [
+            "Reduces Charge mana cost."
+          ],
+          requirements: { NODE: "Unlock Charge" },
+          page: 2
+        }
+      },
+      "3": {
+        "Unlock Uppercut": {
+          name: "Uppercut",
+          description: [
+            "RIGHT-LEFT-LEFT (R-L-L): Launch enemies into the air for heavy damage."
+          ],
+          requirements: {},
+          page: 3
+        },
+        "Unlock Shockwave": {
+          name: "Shockwave",
+          description: [
+            "Bash now creates an additional shockwave."
+          ],
+          requirements: { NODE: "Unlock Bash" },
+          page: 3
+        }
+      }
+    }
+  },
+    assassin: {
+    archetypes: {
+      trickster: { name: "Trickster", description: "Stealth and illusion abilities, deception and clone use.", shortDescription: "Stealth and clones." },
+      acrobat: { name: "Acrobat", description: "Mobility, evasion and aerial combos for burst and escape.", shortDescription: "Agile mobility." },
+      shadestepper: { name: "Shadestepper", description: "Critical strikes and ambush from the shadows.", shortDescription: "Shadow ambush." }
+    },
+    pages: {
+      "1": {
+        "Unlock Spin Attack": {
+          name: "Spin Attack",
+          description: [
+            "RIGHT-LEFT-RIGHT (R-L-R): Strike in a circle, damaging nearby enemies."
+          ],
+          requirements: {},
+          page: 1
+        },
+        "Unlock Dagger Proficiency I": {
+          name: "Dagger Proficiency I",
+          description: [
+            "Increase main attack damage and range while wielding a dagger."
+          ],
+          requirements: {},
+          page: 1
+        },
+        "Unlock Cheaper Spin Attack": {
+          name: "Cheaper Spin Attack",
+          description: [
+            "Reduce Spin Attack's mana cost."
+          ],
+          requirements: { NODE: "Unlock Spin Attack" },
+          page: 1
+        },
+        "Unlock Backstab": {
+          name: "Backstab",
+          description: [
+            "Increase Spin Attack damage if striking from behind."
+          ],
+          requirements: { NODE: "Unlock Dagger Proficiency I" },
+          page: 1
+        }
+      },
+      "2": {
+        "Unlock Vanish": {
+          name: "Vanish",
+          description: [
+            "RIGHT-RIGHT-RIGHT (R-R-R): Turn invisible and move rapidly."
+          ],
+          requirements: {},
+          page: 2
+        },
+        "Unlock Smoke Bomb": {
+          name: "Smoke Bomb",
+          description: [
+            "RIGHT-RIGHT-LEFT (R-R-L): Toss a bomb that applies poison."
+          ],
+          requirements: {},
+          page: 2
+        },
+        "Unlock Cheaper Vanish": {
+          name: "Cheaper Vanish",
+          description: [
+            "Reduces Vanish mana cost."
+          ],
+          requirements: { NODE: "Unlock Vanish" },
+          page: 2
+        }
+      },
+      "3": {
+        "Unlock Multihits": {
+          name: "Multihits",
+          description: [
+            "RIGHT-LEFT-LEFT (R-L-L): Strike multiple times in quick succession."
+          ],
+          requirements: {},
+          page: 3
+        },
+        "Unlock Shadow Strike": {
+          name: "Shadow Strike",
+          description: [
+            "Spin Attack now targets shaded enemies for more damage."
+          ],
+          requirements: { NODE: "Unlock Spin Attack" },
+          page: 3
+        }
+      }
+    }
+  },
+    shaman: {
+    archetypes: {
+      auror: { name: "Acolyte", description: "Focus on support and life manipulation with aura.", shortDescription: "Life manipulation." },
+      ritualist: { name: "Ritualist", description: "Utilize rituals and soul energy for varied effects.", shortDescription: "Rituals and soul use." },
+      summoner: { name: "Summoner", description: "Summon and command puppets and entities.", shortDescription: "Summoning/souls." }
+    },
+    pages: {
+      "1": {
+        "Unlock Totem": {
+          name: "Totem",
+          description: [
+            "RIGHT-LEFT-RIGHT (R-L-R): Place a totem for area effects."
+          ],
+          requirements: {},
+          page: 1
+        },
+        "Unlock Relik Proficiency I": {
+          name: "Relik Proficiency I",
+          description: [
+            "Increase main attack damage and range with a relik."
+          ],
+          requirements: {},
+          page: 1
+        },
+        "Unlock Totemic": {
+          name: "Totemic",
+          description: [
+            "Amplify totem effects for longer duration."
+          ],
+          requirements: { NODE: "Unlock Totem" },
+          page: 1
+        }
+      },
+      "2": {
+        "Unlock Haul": {
+          name: "Haul",
+          description: [
+            "RIGHT-RIGHT-RIGHT (R-R-R): Pull yourself towards your totem."
+          ],
+          requirements: {},
+          page: 2
+        },
+        "Unlock Distant Grasp": {
+          name: "Distant Grasp",
+          description: [
+            "Extend totem range for pulling and energy absorption."
+          ],
+          requirements: {},
+          page: 2
+        },
+        "Unlock Uproot": {
+          name: "Uproot",
+          description: [
+            "RIGHT-LEFT-LEFT (R-L-L): Tear up totems for extra energy and movement."
+          ],
+          requirements: {},
+          page: 2
+        }
+      },
+      "3": {
+        "Unlock Cheaper Haul": {
+          name: "Cheaper Haul",
+          description: [
+            "Reduce Haul mana cost."
+          ],
+          requirements: { NODE: "Unlock Haul" },
+          page: 3
+        },
+        "Unlock Aura": {
+          name: "Aura",
+          description: [
+            "Create a quickly expanding damaging area at your totem."
+          ],
+          requirements: {},
+          page: 3
+        }
+        // ... Continue with all other Shaman abilities per your full list if desired
+      }
+    }
+  }
+}; // <-- this closes the treeData assignment
+        // -------- END STATIC DATA BLOCK --------
+
+    const CLASSES = Object.keys(treeData);
+    let currentClass = CLASSES[0];
+    let currentPage = 1;
+    let selected = {};
+    let unlockOrder = [];
+    let archetypeCounts = {};
+
+    const classSelector = document.getElementById('classSelector');
+    const resetBtn = document.getElementById('resetBtn');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const abilitiesArea = document.getElementById('abilitiesArea');
+    const pageInfo = document.getElementById('pageInfo');
+    const archetypesArea = document.getElementById('archetypesArea');
+    const exportBtn = document.getElementById('export-btn');
+    const exportArea = document.getElementById('export-output');
+
+    classSelector.addEventListener('change', () => {
+      currentClass = classSelector.value;
+      currentPage = 1;
+      selected = {};
+      unlockOrder = [];
+      archetypeCounts = {};
+      render();
+    });
+    resetBtn.onclick = () => { selected = {}; unlockOrder = []; archetypeCounts = {}; render(); };
+
+    prevPageBtn.onclick = () => { 
+      if (currentPage > 1) {
+        currentPage--;
+        unlockOrder.push({ action: "Previous Page" });
+        render();
+      }
+    };
+    nextPageBtn.onclick = () => { 
+      if (currentPage < getMaxPage()) {
+        currentPage++;
+        unlockOrder.push({ action: "Next Page" });
+        render();
       }
     };
 
-    // -----------------------
-const CLASSES = Object.keys(treeData);
-let currentClass = CLASSES;
-let currentPage = 1;
-let selected = {};
-let archetypeCounts = {};
-
-const classSelector = document.getElementById('classSelector');
-const resetBtn = document.getElementById('resetBtn');
-const prevPageBtn = document.getElementById('prevPageBtn');
-const nextPageBtn = document.getElementById('nextPageBtn');
-const abilitiesArea = document.getElementById('abilitiesArea');
-const pageInfo = document.getElementById('pageInfo');
-const archetypesArea = document.getElementById('archetypesArea');
-
-classSelector.addEventListener('change', () => {
-  currentClass = classSelector.value;
-  currentPage = 1;
-  selected = {};
-  archetypeCounts = {};
-  render();
-});
-resetBtn.onclick = () => { selected = {}; archetypeCounts = {}; render(); };
-
-prevPageBtn.onclick = () => { currentPage = Math.max(1, currentPage - 1); render(); };
-nextPageBtn.onclick = () => { currentPage = Math.min(getMaxPage(), currentPage + 1); render(); };
-
-function getCurrentPageAbilities() {
-  const tree = treeData[currentClass];
-  return tree?.pages[currentPage] || {};
-}
-function getMaxPage() {
-  const tree = treeData[currentClass];
-  if (!tree) return 1;
-  return Math.max(...Object.keys(tree.pages).map(Number));
-}
-function canUnlock(id, ab) {
-  if (selected[id]) return false;
-  if (ab.requirements) {
-    if (ab.requirements.NODE && !selected[ab.requirements.NODE]) return false;
-    if (ab.requirements.ARCHETYPE) {
-      let req = ab.requirements.ARCHETYPE;
-      if ((archetypeCounts[req.name] || 0) < req.amount) return false;
+    function getCurrentPageAbilities() {
+      const tree = treeData[currentClass];
+      return tree?.pages[currentPage] || {};
     }
-  }
-  if (ab.locks) {
-    for (let l of ab.locks) if (selected[l]) return false;
-  }
-  return true;
-}
-function handleUnlock(id, ab) {
-  selected[id] = true;
-  const archetypes = treeData[currentClass].archetypes;
-  Object.entries(archetypes).forEach(([arch, o]) => {
-    if (ab.description.some(d => d.toLowerCase().includes(o.name.toLowerCase())))
-      archetypeCounts[arch] = (archetypeCounts[arch] || 0) + 1;
-  });
-  render();
-}
+    function getMaxPage() {
+      const tree = treeData[currentClass];
+      if (!tree) return 1;
+      return Math.max(...Object.keys(tree.pages).map(Number));
+    }
+    function canUnlock(id, ab) {
+      if (selected[id]) return false;
+      if (ab.requirements) {
+        if (ab.requirements.NODE && !selected[ab.requirements.NODE]) return false;
+        if (ab.requirements.ARCHETYPE) {
+          let req = ab.requirements.ARCHETYPE;
+          if ((archetypeCounts[req.name] || 0) < req.amount) return false;
+        }
+      }
+      if (ab.locks) {
+        for (let l of ab.locks) if (selected[l]) return false;
+      }
+      return true;
+    }
+    function handleUnlock(id, ab) {
+      selected[id] = true;
+      unlockOrder.push({ action: id });
+      const archetypes = treeData[currentClass].archetypes;
+      Object.entries(archetypes).forEach(([arch, o]) => {
+        if (ab.description.some(d => d.toLowerCase().includes(o.name.toLowerCase())))
+          archetypeCounts[arch] = (archetypeCounts[arch] || 0) + 1;
+      });
+      render();
+    }
 
-function renderAbilitiesAndArchetypes() {
-  abilitiesArea.innerHTML = '';
-  const abilities = getCurrentPageAbilities();
-  for (const [id, ab] of Object.entries(abilities)) {
-    let li = document.createElement('div');
-    li.className = 'ability ' +
-        (selected[id] ? 'selected' : (canUnlock(id, ab) ? 'canunlock' : 'locked'));
-    li.innerHTML =
-      `<strong>${ab.name}</strong> (Cost: ${ab.requirements?.ABILITY_POINTS || 1})` +
-      `<div class="desc">${ab.description.map(txt => `<div>${txt}</div>`).join('')}</div>` +
-      `<em>` +
-        `${ab.requirements?.NODE ? `Prerequisite: ${(abilities[ab.requirements.NODE]?.name || ab.requirements.NODE)}. ` : ''}` +
-        `${ab.requirements?.ARCHETYPE ? `Archetype: ${treeData[currentClass].archetypes[ab.requirements.ARCHETYPE.name]?.name || ab.requirements.ARCHETYPE.name} (${ab.requirements.ARCHETYPE.amount})` : ''}` +
-      `</em><br>` +
-      `<button ${canUnlock(id, ab) ? '' : 'disabled'}>${selected[id] ? "Unlocked" : "Unlock"}</button>`;
-    li.querySelector('button').onclick = () => handleUnlock(id, ab);
-    abilitiesArea.appendChild(li);
-  }
-  archetypesArea.innerHTML = '<h4>Archetype Progress</h4><ul>' +
-    Object.entries(treeData[currentClass].archetypes)
-      .map(([k, v]) =>
-        `<li>${v.name}: ${archetypeCounts[k] || 0}</li>`)
-      .join('') +
-    '</ul>';
-}
-function render() {
-  classSelector.value = currentClass;
-  const maxPage = getMaxPage();
-  pageInfo.textContent = `Page ${currentPage} / ${maxPage}`;
-  prevPageBtn.disabled = currentPage <= 1;
-  nextPageBtn.disabled = currentPage >= maxPage;
-  if (treeData[currentClass]) renderAbilitiesAndArchetypes();
-  else abilitiesArea.innerHTML = 'Loading...';
-}
+    function renderAbilitiesAndArchetypes() {
+      abilitiesArea.innerHTML = '';
+      const abilities = getCurrentPageAbilities();
+      for (const [id, ab] of Object.entries(abilities)) {
+        let li = document.createElement('div');
+        li.className = 'ability ' +
+            (selected[id] ? 'selected' : (canUnlock(id, ab) ? 'canunlock' : 'locked'));
+        li.innerHTML =
+          `<strong>${ab.name}</strong>` +
+          `<div class="desc">${ab.description.map(txt => `<div>${txt}</div>`).join('')}</div>` +
+          `<em>` +
+            `${ab.requirements?.NODE ? `Prerequisite: ${(abilities[ab.requirements.NODE]?.name || ab.requirements.NODE)}. ` : ''}` +
+            `${ab.requirements?.ARCHETYPE ? `Archetype: ${treeData[currentClass].archetypes[ab.requirements.ARCHETYPE.name]?.name || ab.requirements.ARCHETYPE.name} (${ab.requirements.ARCHETYPE.amount})` : ''}` +
+          `</em><br>` +
+          `<button ${canUnlock(id, ab) ? '' : 'disabled'}>${selected[id] ? "Unlocked" : "Unlock"}</button>`;
+        li.querySelector('button').onclick = () => handleUnlock(id, ab);
+        abilitiesArea.appendChild(li);
+      }
+      archetypesArea.innerHTML = '<h4>Archetype Progress</h4><ul>' +
+        Object.entries(treeData[currentClass].archetypes)
+          .map(([k, v]) =>
+            `<li>${v.name}: ${archetypeCounts[k] || 0}</li>`)
+          .join('') +
+        '</ul>';
+    }
+    function render() {
+      classSelector.value = currentClass;
+      const maxPage = getMaxPage();
+      pageInfo.textContent = `Page ${currentPage} / ${maxPage}`;
+      prevPageBtn.disabled = currentPage <= 1;
+      nextPageBtn.disabled = currentPage >= maxPage;
+      if (treeData[currentClass]) renderAbilitiesAndArchetypes();
+      else abilitiesArea.innerHTML = 'Loading...';
+      exportArea.value = '';
+    }
 
-// Populate class selector if you add more classes
-function updateClassSelector() {
-  classSelector.innerHTML = '';
-  CLASSES.forEach(cls => {
-    const opt = document.createElement('option');
-    opt.value = cls;
-    opt.textContent = cls.charAt(0).toUpperCase() + cls.slice(1);
-    classSelector.appendChild(opt);
-  });
-}
-updateClassSelector();
-render();
-</script> </body> </html>
+    exportBtn.onclick = function() {
+      // Format for Java export
+      const arr = unlockOrder.map(x => x.action);
+      const javaList = 'new ArrayList<>(List.of(' +
+        arr.map(e => `"${e}"`).join(', ') +
+        '));';
+      exportArea.value = javaList;
+    };
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>
+
+
+
 
 
