@@ -21,7 +21,10 @@
   <div>
     <label>
       Class:
-      <select id="classSelector"></select>
+      <select id="classSelector">
+          <option value="mage">Mage</option>
+          <!-- Add more classes as needed -->
+      </select>
     </label>
     <button id="resetBtn">Reset</button>
   </div>
@@ -33,123 +36,166 @@
   <div id="abilitiesArea"></div>
   <div id="archetypesArea"></div>
   <script>
-    const CLASSES = ['archer', 'warrior', 'mage', 'assassin', 'shaman'];
-    let treeData = {};
-    let currentClass = 'archer';
-    let currentPage = 1;
-    let selected = {};
-    let archetypeCounts = {};
-
-    const classSelector = document.getElementById('classSelector');
-    const resetBtn = document.getElementById('resetBtn');
-    const prevPageBtn = document.getElementById('prevPageBtn');
-    const nextPageBtn = document.getElementById('nextPageBtn');
-    const abilitiesArea = document.getElementById('abilitiesArea');
-    const pageInfo = document.getElementById('pageInfo');
-    const archetypesArea = document.getElementById('archetypesArea');
-
-    CLASSES.forEach(cls => {
-      const opt = document.createElement('option');
-      opt.value = cls;
-      opt.textContent = cls.charAt(0).toUpperCase() + cls.slice(1);
-      classSelector.appendChild(opt);
-    });
-
-    classSelector.addEventListener('change', () => {
-      currentClass = classSelector.value;
-      currentPage = 1;
-      selected = {};
-      archetypeCounts = {};
-      render();
-    });
-    resetBtn.onclick = () => { selected = {}; archetypeCounts = {}; render(); };
-
-    prevPageBtn.onclick = () => { currentPage = Math.max(1, currentPage - 1); render(); };
-    nextPageBtn.onclick = () => { currentPage = Math.min(getMaxPage(), currentPage + 1); render(); };
-
-    function fetchAllTrees(cb) {
-      let remaining = CLASSES.length;
-      CLASSES.forEach(cls => {
-        fetch(`https://api.wynncraft.com/v3/ability/tree/${cls}`)
-          .then(r => r.json())
-          .then(data => {
-            treeData[cls] = data;
-            remaining--;
-            if (remaining === 0) cb();
-          });
-      });
-    }
-
-    function getCurrentPageAbilities() {
-      const tree = treeData[currentClass];
-      return tree?.pages[currentPage] || {};
-    }
-    function getMaxPage() {
-      const tree = treeData[currentClass];
-      if (!tree) return 1;
-      return Math.max(...Object.keys(tree.pages).map(Number));
-    }
-    function canUnlock(id, ab) {
-      if (selected[id]) return false;
-      if (ab.requirements) {
-        if (ab.requirements.NODE && !selected[ab.requirements.NODE]) return false;
-        if (ab.requirements.ARCHETYPE) {
-          let req = ab.requirements.ARCHETYPE;
-          if ((archetypeCounts[req.name] || 0) < req.amount) return false;
+    // ----- STATIC DATA -----
+    const treeData = {
+      mage: {
+        archetypes: {
+          blitz: { name: "Riftwalker", description: "Bend time and ramp up", shortDescription: "Bend time and ramp up" },
+          priest: { name: "Light Bender", description: "Grow from healing", shortDescription: "Grow from healing" },
+          arcane: { name: "Arcanist", description: "Uncontrollable chaotic power", shortDescription: "Uncontrollable chaotic power" },
+        },
+        pages: {
+          "1": {
+            meteor: {
+              name: "Meteor",
+              description: [
+                "Click Combo: RIGHT-LEFT-LEFT",
+                "Conjures a slow but powerful meteor from the sky, dealing massive damage over a large area.",
+                "Mana Cost: 50",
+                "Total Damage: 400%"
+              ],
+              requirements: { ABILITY_POINTS: 1 },
+              links: ["wandProficiency"],
+              locks: null,
+              page: 1,
+            },
+            wandProficiency: {
+              name: "Wand Proficiency I",
+              description: [
+                "Improve your Main Attack's damage and range when using a wand.",
+                "Main Attack Damage: +5%",
+                "Main Attack Range: +2 Blocks"
+              ],
+              requirements: { ABILITY_POINTS: 1 },
+              links: [],
+              locks: null,
+              page: 1,
+            }
+          },
+          "2": {
+            teleport: {
+              name: "Teleport",
+              description: [
+                "Click Combo: RIGHT-RIGHT-RIGHT",
+                "Instantly teleport in the direction you're facing.",
+                "Mana Cost: 25"
+              ],
+              requirements: { ABILITY_POINTS: 1 },
+              links: [],
+              locks: null,
+              page: 2,
+            }
+          }
         }
       }
-      if (ab.locks) {
-        for (let l of ab.locks) if (selected[l]) return false;
-      }
-      return true;
-    }
-    function handleUnlock(id, ab) {
-      selected[id] = true;
-      const archetypes = treeData[currentClass].archetypes;
-      Object.entries(archetypes).forEach(([arch, o]) => {
-        if (ab.description.some(d => d.toLowerCase().includes(o.name.toLowerCase())))
-          archetypeCounts[arch] = (archetypeCounts[arch] || 0) + 1;
-      });
-      render();
-    }
+    };
 
-    function renderAbilitiesAndArchetypes() {
-      abilitiesArea.innerHTML = '';
-      const abilities = getCurrentPageAbilities();
-      for (const [id, ab] of Object.entries(abilities)) {
-        let li = document.createElement('div');
-        li.className = 'ability ' +
-            (selected[id] ? 'selected' : (canUnlock(id, ab) ? 'canunlock' : 'locked'));
-        li.innerHTML =
-          `<strong>${ab.name}</strong> (Cost: ${ab.requirements?.ABILITY_POINTS || 1})
-          <div class="desc">${ab.description.map(txt => `<div>${txt}</div>`).join('')}</div>
-          <em>
-            ${ab.requirements?.NODE ? `Prerequisite: ${(abilities[ab.requirements.NODE]?.name || ab.requirements.NODE)}. ` : ''}
-            ${ab.requirements?.ARCHETYPE ? `Archetype: ${treeData[currentClass].archetypes[ab.requirements.ARCHETYPE.name]?.name || ab.requirements.ARCHETYPE.name} (${ab.requirements.ARCHETYPE.amount})` : ''}
-          </em><br>
-          <button ${canUnlock(id, ab) ? '' : 'disabled'}>${selected[id] ? "Unlocked" : "Unlock"}</button>
-          `;
-        li.querySelector('button').onclick = () => handleUnlock(id, ab);
-        abilitiesArea.appendChild(li);
-      }
-      archetypesArea.innerHTML = '<h4>Archetype Progress</h4><ul>' +
-        Object.entries(treeData[currentClass].archetypes)
-          .map(([k, v]) =>
-            `<li>${v.name}: ${archetypeCounts[k] || 0}</li>`)
-          .join('') +
-        '</ul>';
-    }
-    function render() {
-      classSelector.value = currentClass;
-      const maxPage = getMaxPage();
-      pageInfo.textContent = `Page ${currentPage} / ${maxPage}`;
-      prevPageBtn.disabled = currentPage <= 1;
-      nextPageBtn.disabled = currentPage >= maxPage;
-      if (treeData[currentClass]) renderAbilitiesAndArchetypes();
-      else abilitiesArea.innerHTML = 'Loading...';
-    }
+    // -----------------------
+const CLASSES = Object.keys(treeData);
+let currentClass = CLASSES;
+let currentPage = 1;
+let selected = {};
+let archetypeCounts = {};
 
-    fetchAllTrees(render);
-  </script>
-</body>
-</html>
+const classSelector = document.getElementById('classSelector');
+const resetBtn = document.getElementById('resetBtn');
+const prevPageBtn = document.getElementById('prevPageBtn');
+const nextPageBtn = document.getElementById('nextPageBtn');
+const abilitiesArea = document.getElementById('abilitiesArea');
+const pageInfo = document.getElementById('pageInfo');
+const archetypesArea = document.getElementById('archetypesArea');
+
+classSelector.addEventListener('change', () => {
+  currentClass = classSelector.value;
+  currentPage = 1;
+  selected = {};
+  archetypeCounts = {};
+  render();
+});
+resetBtn.onclick = () => { selected = {}; archetypeCounts = {}; render(); };
+
+prevPageBtn.onclick = () => { currentPage = Math.max(1, currentPage - 1); render(); };
+nextPageBtn.onclick = () => { currentPage = Math.min(getMaxPage(), currentPage + 1); render(); };
+
+function getCurrentPageAbilities() {
+  const tree = treeData[currentClass];
+  return tree?.pages[currentPage] || {};
+}
+function getMaxPage() {
+  const tree = treeData[currentClass];
+  if (!tree) return 1;
+  return Math.max(...Object.keys(tree.pages).map(Number));
+}
+function canUnlock(id, ab) {
+  if (selected[id]) return false;
+  if (ab.requirements) {
+    if (ab.requirements.NODE && !selected[ab.requirements.NODE]) return false;
+    if (ab.requirements.ARCHETYPE) {
+      let req = ab.requirements.ARCHETYPE;
+      if ((archetypeCounts[req.name] || 0) < req.amount) return false;
+    }
+  }
+  if (ab.locks) {
+    for (let l of ab.locks) if (selected[l]) return false;
+  }
+  return true;
+}
+function handleUnlock(id, ab) {
+  selected[id] = true;
+  const archetypes = treeData[currentClass].archetypes;
+  Object.entries(archetypes).forEach(([arch, o]) => {
+    if (ab.description.some(d => d.toLowerCase().includes(o.name.toLowerCase())))
+      archetypeCounts[arch] = (archetypeCounts[arch] || 0) + 1;
+  });
+  render();
+}
+
+function renderAbilitiesAndArchetypes() {
+  abilitiesArea.innerHTML = '';
+  const abilities = getCurrentPageAbilities();
+  for (const [id, ab] of Object.entries(abilities)) {
+    let li = document.createElement('div');
+    li.className = 'ability ' +
+        (selected[id] ? 'selected' : (canUnlock(id, ab) ? 'canunlock' : 'locked'));
+    li.innerHTML =
+      `<strong>${ab.name}</strong> (Cost: ${ab.requirements?.ABILITY_POINTS || 1})` +
+      `<div class="desc">${ab.description.map(txt => `<div>${txt}</div>`).join('')}</div>` +
+      `<em>` +
+        `${ab.requirements?.NODE ? `Prerequisite: ${(abilities[ab.requirements.NODE]?.name || ab.requirements.NODE)}. ` : ''}` +
+        `${ab.requirements?.ARCHETYPE ? `Archetype: ${treeData[currentClass].archetypes[ab.requirements.ARCHETYPE.name]?.name || ab.requirements.ARCHETYPE.name} (${ab.requirements.ARCHETYPE.amount})` : ''}` +
+      `</em><br>` +
+      `<button ${canUnlock(id, ab) ? '' : 'disabled'}>${selected[id] ? "Unlocked" : "Unlock"}</button>`;
+    li.querySelector('button').onclick = () => handleUnlock(id, ab);
+    abilitiesArea.appendChild(li);
+  }
+  archetypesArea.innerHTML = '<h4>Archetype Progress</h4><ul>' +
+    Object.entries(treeData[currentClass].archetypes)
+      .map(([k, v]) =>
+        `<li>${v.name}: ${archetypeCounts[k] || 0}</li>`)
+      .join('') +
+    '</ul>';
+}
+function render() {
+  classSelector.value = currentClass;
+  const maxPage = getMaxPage();
+  pageInfo.textContent = `Page ${currentPage} / ${maxPage}`;
+  prevPageBtn.disabled = currentPage <= 1;
+  nextPageBtn.disabled = currentPage >= maxPage;
+  if (treeData[currentClass]) renderAbilitiesAndArchetypes();
+  else abilitiesArea.innerHTML = 'Loading...';
+}
+
+// Populate class selector if you add more classes
+function updateClassSelector() {
+  classSelector.innerHTML = '';
+  CLASSES.forEach(cls => {
+    const opt = document.createElement('option');
+    opt.value = cls;
+    opt.textContent = cls.charAt(0).toUpperCase() + cls.slice(1);
+    classSelector.appendChild(opt);
+  });
+}
+updateClassSelector();
+render();
+
+
